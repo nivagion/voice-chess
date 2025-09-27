@@ -55,9 +55,63 @@ def parse_move(board: chess.Board, raw: str) -> chess.Move | None:
     return move if move in board.legal_moves else None
 
 
+import os
+import sys
+import time
+
+def input_pumped(prompt: str) -> str:
+    """
+    Non-blocking, cross-platform console input that keeps the pygame window responsive.
+    Works on Linux/macOS via select() and on Windows via msvcrt.
+    """
+    print(prompt, end="", flush=True)
+    buf = []
+    # Windows path
+    if os.name == "nt":
+        import msvcrt
+        while True:
+            viewer.pump()       # keep window movable/closable
+            if msvcrt.kbhit():
+                ch = msvcrt.getwch()  # wide char to support arrows/backspace etc.
+                if ch in ("\r", "\n"):
+                    print()
+                    return "".join(buf)
+                elif ch == "\b":       # backspace
+                    if buf:
+                        buf.pop()
+                        # erase last char from console
+                        print("\b \b", end="", flush=True)
+                else:
+                    buf.append(ch)
+                    print(ch, end="", flush=True)
+            time.sleep(0.01)
+    # POSIX path (Linux/macOS)
+    else:
+        import select
+        while True:
+            viewer.pump()
+            rlist, _, _ = select.select([sys.stdin], [], [], 0.05)
+            if rlist:
+                line = sys.stdin.readline()
+                # echo is already printed by terminal when you type
+                return line.rstrip("\n")
+
+def choose_side():
+    while True:
+        side = input_pumped("Choose side: [w]hite / [b]lack / [r]andom: ").strip().lower()
+        if side in ("w", "b", "r"):
+            break
+        print("Please enter w, b, or r.")
+    if side == "r":
+        side = random.choice(["w", "b"])
+        print(f"Random chose: {side.upper()}")
+    return side == "w"
+
 def input_move(board: chess.Board) -> chess.Move | None:
     while True:
-        s = input("Your move ('e2 to e4','e2 e4', 'e7e8q' (q,r,b,n), 'help', 'quit'): ").strip().lower()
+        s = input_pumped(
+            "Your move ('e2 to e4','e2 e4', 'e7e8q' (q,r,b,n), 'help', 'quit'): "
+        ).strip().lower()
         if s in ("q", "quit", "exit", "resign"):
             return None
         if s in ("h", "help"):
