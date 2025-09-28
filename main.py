@@ -10,7 +10,6 @@ import time
 
 import viewer
 
-#for vosk
 import json
 import queue
 import sounddevice as sd
@@ -36,21 +35,19 @@ def print_board(board: chess.Board):  # printa ploču s obrubom (oznake redova i
 
 def normalize_move_text(s: str) -> str:
     s = s.strip().lower()
-    # Normalize connectors
     s = s.replace(" to ", " ")
     s = s.replace("->", " ")
     s = s.replace("-", " ")
-    # Collapse all spaces
-    s = re.sub(r"\s+", "", s)
+    s = re.sub(r"\s+", "", s) # miče razmake
     return s
 
 def parse_move(board: chess.Board, raw: str) -> chess.Move | None:
     """
-    Accepts:
+        Prihvaća poteze u formatima:
       - e2 to e4
       - e2 e4
       - e2e4
-      - e7e8q (promotion in UCI format) (q, r, b, n).
+      - e7e8q (promotion in UCI format) (q, r, b, n). UCI format je ono e2e4, e7e8q itd. za razliku od SAN koji je Nf3
     """
     text = normalize_move_text(raw)
     try:
@@ -61,26 +58,25 @@ def parse_move(board: chess.Board, raw: str) -> chess.Move | None:
 
 """ovo koristim da ne moram threadati pygame event loop, nego samo povremeno pumpam, pygame handla eventove"""
 """bio je probllem na Windowsima gdje se window znao zamrznuti ako se ne pumpa event loop"""
+"""Python’s built-in input() blocks everything until Enter is pressed."""
 def input_pumped(prompt: str) -> str:
     print(prompt, end="", flush=True)
     buf = []
-    # Windows path
-    if os.name == "nt":
+    if os.name == "nt": # Windows path
         import msvcrt
         while True:
-            viewer.pump()       # keep window movable/closable
+            viewer.pump() # window movable/closable
             if msvcrt.kbhit():
-                ch = msvcrt.getwch()  # wide char to support arrows/backspace etc.
-                if ch in ("\r", "\n"):
+                ch = msvcrt.getwch()  # wide char supports arrows/backspace etc.
+                if ch in ("\r", "\n"): # If Enter is pressed → stop input, return the typed string.
                     print()
                     return "".join(buf)
                 elif ch == "\b":       # backspace
                     if buf:
-                        buf.pop()
-                        # erase last char from console
+                        buf.pop() # If Backspace is pressed → remove last char from buf and visually erase it in the console.
                         print("\b \b", end="", flush=True)
                 else:
-                    buf.append(ch)
+                    buf.append(ch) # Any normal key → add it to the buffer and display it.
                     print(ch, end="", flush=True)
             time.sleep(0.01)
     # POSIX path (Linux/macOS)
@@ -111,7 +107,7 @@ def input_move(board: chess.Board) -> chess.Move | None:
             "Your move ('e2 to e4','e2 e4','e7e8q' (q,r,b,n), 'help', 'quit') — press Enter to speak: "
         ).strip().lower()
 
-        # Empty input -> voice
+        # Empty input ili voice > slušaj mikofon
         if s == "" or s == "voice":
             vm = voice_move_once(board)
             if vm is None:
@@ -160,10 +156,10 @@ def announce_result(board: chess.Board):
 
 # VOSK CONFIG 
 ## OVO MOŽDA PREBACITI U POSEBNU SKRIPTU
-""" kad stisnemo ENTER zove voice_move_once(), capture pocinje odmah i sluša do timeouta ili dok se ne prepozna nešto, ne mora stisnuti ENTER da završi
+""" kad stisnemo ENTER zove voice_move_once(), capture pocinje odmah i sluša do timeouta ili dok se ne prepozna nešto, ne stisnut ENTER da završi
 nego prestaje slušati kad model prepozna kraj(nema govora) ili kad istekne timeout"""
 
-MODEL_DIR = "models/vosk-model-small-en-us-0.15"  # change if you use a different model
+MODEL_DIR = "models/vosk-model-small-en-us-0.15"  # model za engleski, mali (50MB)
 SAMPLE_RATE = 16000
 
 # grammar za improvanje prepoznavanja šahovskih poteza
@@ -440,9 +436,8 @@ def main():
     board = chess.Board()
     human_is_white = choose_side()
 
-    # === init the visual viewer (PNG pieces expected in ./figures) ===
-    viewer.configure(figures_dir="figures", tile=80)  # optional overrides
-    viewer.init()                 # no-op if pygame/assets missing
+    viewer.configure(figures_dir="figures", tile=80)
+    viewer.init()
     viewer.pump()
     viewer.render(board)
 
@@ -453,26 +448,24 @@ def main():
         print("You are Black. Bot moves first.")
 
     while not board.is_game_over():
-        # keep window responsive while waiting for input
+        # drži prozor responzivnim dok čeka input
         viewer.pump()
 
         human_turn = (board.turn == chess.WHITE) == human_is_white
         if human_turn:
-            # Human turn
             move = input_move(board)
             if move is None:
                 print("You resigned / quit. Bye!")
                 viewer.close()
                 sys.exit(0)
-            human_san = board.san(move)  # <-- before push
+            human_san = board.san(move) # ovo je zapis koji se koristi u šahu (npr. Nf3, e4, O-O, exd5) samo za debugging, nepotrebno je
             board.push(move)
             print(f"You played: {move.uci()} ({human_san})")
             print_board(board)
             viewer.pump(); viewer.render(board)
         else:
-            # Bot turn
-            bot_move = random_bot_move(board)
-            bot_san = board.san(bot_move)  # <-- before push
+            bot_move = random_bot_move(board) ## PLACEHOLDER FOR BOT MOVE
+            bot_san = board.san(bot_move)
             board.push(bot_move)
             print(f"Bot played:  {bot_move.uci()} ({bot_san})")
             print_board(board)

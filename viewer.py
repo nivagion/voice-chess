@@ -12,10 +12,10 @@ DARK  = (181, 136, 99)
 HL_LAST = (246, 246, 105)
 
 # padding oko ploče
-PAD_LEFT   = 28 # space for rank numbers on the left
-PAD_RIGHT  = 28 # space for rank numbers on the right
-PAD_TOP    = 22 # space for file letters on the top
-PAD_BOTTOM = 52 # space for file letters + info line at the bottom
+PAD_LEFT   = 28 # rankovi
+PAD_RIGHT  = 28 # rankovi
+PAD_TOP    = 22 # fileovi
+PAD_BOTTOM = 52 # fileovi + info redak
 
 FIGURES_DIR = os.path.join(os.path.dirname(__file__), "figures")
 
