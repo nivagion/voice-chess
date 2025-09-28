@@ -59,11 +59,9 @@ import os
 import sys
 import time
 
+"""ovo koristim da ne moram threadati pygame event loop, nego samo povremeno pumpam, pygame handla eventove"""
+"""bio je probllem na Windowsima gdje se window znao zamrznuti ako se ne pumpa event loop"""
 def input_pumped(prompt: str) -> str:
-    """
-    Non-blocking, cross-platform console input that keeps the pygame window responsive.
-    Works on Linux/macOS via select() and on Windows via msvcrt.
-    """
     print(prompt, end="", flush=True)
     buf = []
     # Windows path
