@@ -3,36 +3,40 @@ import chess
 import threading
 
 
-# veličina polja u pikselima
+# Veličina jednog polja na ploči u pikselima
 TILE = 80
+# Širina okvira oko ploče u pikselima
 BORDER = 20
-# boje polja
+# Boje svijetlog i tamnog polja
 LIGHT = (240, 217, 181)
 DARK  = (181, 136, 99)
+# Boja za isticanje zadnjeg poteza
 HL_LAST = (246, 246, 105)
 
-# padding oko ploče
-PAD_LEFT   = 28 # rankovi
-PAD_RIGHT  = 28 # rankovi
-PAD_TOP    = 22 # fileovi
-PAD_BOTTOM = 52 # fileovi + info redak
+# Padding oko ploče za ispis oznaka (file/rank) i info linije
+PAD_LEFT   = 28  # prostor lijevo za brojeve rankova
+PAD_RIGHT  = 28  # prostor desno za brojeve rankova
+PAD_TOP    = 22  # prostor iznad ploče za oznake fileova
+PAD_BOTTOM = 52  # prostor ispod ploče za fileove + info redak
 
+# Putanja do foldera sa slikama figura
 FIGURES_DIR = os.path.join(os.path.dirname(__file__), "figures")
 
-# ovo koristi viewer kao flagove
-_enabled = False # True ako init() uspije
+# Ove varijable viewer koristi kao flagove / cache
+_enabled = False  # True ako je init() uspio i prozor je aktivan
 _warned = False
 _piece_cache = {}
 _screen = None
 _info_font = None
 
+# Mapiranje tipa figure na slovo iz imena PNG datoteka
 PIECE_LETTER = {
     chess.PAWN: 'p', chess.KNIGHT: 'n', chess.BISHOP: 'b',
     chess.ROOK: 'r', chess.QUEEN: 'q', chess.KING: 'k',
 }
 
 def configure(*, figures_dir: str | None = None, tile: int | None = None):
-    """zvati prije init() ako se želi promijeniti default lokacija za slike ili veličina polja"""
+    """Zvati prije init() ako se želi promijeniti default lokaciju za slike ili veličinu polja."""
     global FIGURES_DIR, TILE
     if figures_dir:
         FIGURES_DIR = figures_dir
@@ -40,13 +44,14 @@ def configure(*, figures_dir: str | None = None, tile: int | None = None):
         TILE = int(tile)
 
 def init(width: int | None = None, height: int | None = None, caption="Voice Chess — Board View") -> bool:
-                # ili je int ili None, a return type je bool
+                # width/height su ili int ili None, a funkcija vraća bool koji kaže je li viewer aktivan
     """
-    Initialize the viewer. Returns True if window is active, False if disabled (no pygame/assets).
-    Safe to call multiple times; a no-op if already enabled.
+    Inicijalizira viewer. Vraća True ako je prozor uspješno pokrenut, False ako je viewer onemogućen
+    (npr. nema pygame-a ili asseta).
+    Funkciju je sigurno zvati više puta; ako je već inicijalizirano, napravi se no-op.
     """
     global _enabled, _screen, _info_font, _warned
-    if _enabled:  # already good
+    if _enabled:  # već je sve spremno
         return True
     try:
         import pygame
@@ -57,7 +62,7 @@ def init(width: int | None = None, height: int | None = None, caption="Voice Che
         return False
 
     pygame.init()
-    # compute window size (board + border + label pads)
+    # Izračunaj veličinu prozora (ploča + border + padovi za oznake)
     board_size = TILE * 8
     w = board_size + BORDER*2 + PAD_LEFT + PAD_RIGHT
     h = board_size + BORDER*2 + PAD_TOP + PAD_BOTTOM
@@ -70,7 +75,7 @@ def init(width: int | None = None, height: int | None = None, caption="Voice Che
     return True
 
 def pump():
-    """Keep the window responsive; allows closing the window without killing the game."""
+    """Obrađuje pygame evente da prozor ostane responzivan; omogućuje zatvaranje prozora bez rušenja igre."""
     global _enabled, _screen
     if not _enabled or _screen is None:
         return
@@ -84,18 +89,20 @@ def pump():
             return
 
 def render(board: chess.Board):
-    """Draw the current board state. No-op if viewer not enabled."""
+    """Iscrtava trenutno stanje šahovske ploče. Ako viewer nije aktivan, funkcija ne radi ništa."""
     if not _enabled or _screen is None:
         return
     import pygame
 
     def square_to_rc(square: int):
-        # row 0 is top; col 0 is left
+        # Pretvara indeks polja (0-63) u redak i stupac u koordinatnom sustavu ekrana
+        # row 0 je vrh ploče; col 0 je lijevo
         rank = 7 - chess.square_rank(square)
         file = chess.square_file(square)
         return rank, file
 
     def get_piece_image(piece: chess.Piece):
+        # Dohvaća Surface za figuru iz cachea ili je učitava s diska i sprema u cache
         key = (piece.piece_type, piece.color, TILE)
         if key in _piece_cache:
             return _piece_cache[key]
@@ -105,7 +112,7 @@ def render(board: chess.Board):
         path = os.path.join(FIGURES_DIR, filename)
         if not os.path.isfile(path):
             nonlocal_warn_missing(path)
-            # fallback circle placeholder
+            # fallback: nacrtaj jednostavni krug umjesto figure
             img = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
             pygame.draw.circle(
                 img,
@@ -122,7 +129,7 @@ def render(board: chess.Board):
         return img
 
     def nonlocal_warn_missing(path):
-        # Print once per missing filename
+        # Ispiše upozorenje za nedostajuću sliku samo jednom po nazivu datoteke
         key = ("missing", os.path.basename(path))
         if key not in _piece_cache:
             print(f"[viewer] Missing piece image: {path}")
@@ -130,21 +137,21 @@ def render(board: chess.Board):
 
     board_size = TILE * 8
 
-    # origins (top-left of a8 square)
+    # Početne koordinate (gornji lijevi kut polja a8)
     origin_x = BORDER + PAD_LEFT
     origin_y = BORDER + PAD_TOP
 
-    # background
+    # Pozadina oko ploče
     _screen.fill((230, 230, 230))
 
-    # squares
+    # Iscrtavanje polja (svijetlo/tamno)
     for row in range(8):
         for col in range(8):
             color = LIGHT if (row + col) % 2 == 0 else DARK
             rect = pygame.Rect(origin_x + col*TILE, origin_y + row*TILE, TILE, TILE)
             pygame.draw.rect(_screen, color, rect)
 
-    # last move highlight
+    # Isticanje zadnjeg poteza (iz polja i u polje)
     if board.move_stack:
         last = board.peek()
         for sq in (last.from_square, last.to_square):
@@ -154,7 +161,7 @@ def render(board: chess.Board):
             s.fill((*HL_LAST, 60))
             _screen.blit(s, rect.topleft)
 
-    # pieces
+    # Crtanje figura
     for sq in chess.SQUARES:
         piece = board.piece_at(sq)
         if not piece:
@@ -163,31 +170,31 @@ def render(board: chess.Board):
         img = get_piece_image(piece)
         _screen.blit(img, (origin_x + c*TILE, origin_y + r*TILE))
 
-    # file letters (a-h) bottom and top
+    # Oznake fileova (a-h) dolje i gore
     files = "abcdefgh"
     for col in range(8):
         ch = files[col]
         t = _info_font.render(ch, True, (10, 10, 10))
-        # bottom
+        # dolje
         rect_b = t.get_rect(midtop=(origin_x + col*TILE + TILE/2, origin_y + board_size + 6))
         _screen.blit(t, rect_b)
-        # top
+        # gore
         rect_t = t.get_rect(midbottom=(origin_x + col*TILE + TILE/2, origin_y - 6))
         _screen.blit(t, rect_t)
 
-    # rank numbers (8-1) left and right
+    # Oznake rankova (8-1) lijevo i desno
     for row in range(8):
         ch = str(8 - row)
         t = _info_font.render(ch, True, (10, 10, 10))
         cy = origin_y + row*TILE + TILE/2
-        # left
+        # lijevo
         rect_l = t.get_rect(midright=(origin_x - 6, cy))
         _screen.blit(t, rect_l)
-        # right
+        # desno
         rect_r = t.get_rect(midleft=(origin_x + board_size + 6, cy))
         _screen.blit(t, rect_r)
 
-    # info line
+    # Info linija na dnu (čiji je potez + hint da se prozor može zatvoriti)
     msg = f"Turn: {'White' if board.turn == chess.WHITE else 'Black'}"
     info = _info_font.render(msg + "  |  Close window to hide viewer", True, (10, 10, 10))
     _screen.blit(info, (origin_x, origin_y + board_size + 24))
@@ -195,7 +202,7 @@ def render(board: chess.Board):
     pygame.display.flip()
 
 def close():
-    """Close the viewer window (optional)."""
+    """Zatvara viewer prozor (opcionalno; sigurno zvati više puta)."""
     global _enabled, _screen
     if not _enabled or _screen is None:
         return
