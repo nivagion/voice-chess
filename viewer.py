@@ -3,21 +3,21 @@ import chess
 import threading
 
 
-# Veličina jednog polja na ploči u pikselima
+# veličina polja u pikselima
 TILE = 80
-# Širina okvira oko ploče u pikselima
+# širina okvira oko ploče u pikselima
 BORDER = 20
-# Boje svijetlog i tamnog polja
+# boje polja
 LIGHT = (240, 217, 181)
 DARK  = (181, 136, 99)
-# Boja za isticanje zadnjeg poteza
+# boja zadnjeg poteza
 HL_LAST = (246, 246, 105)
 
-# Padding oko ploče za ispis oznaka (file/rank) i info linije
-PAD_LEFT   = 28  # prostor lijevo za brojeve rankova
-PAD_RIGHT  = 28  # prostor desno za brojeve rankova
-PAD_TOP    = 22  # prostor iznad ploče za oznake fileova
-PAD_BOTTOM = 52  # prostor ispod ploče za fileove + info redak
+# padding oko ploče za ispis oznaka (file/rank) i info linije
+PAD_LEFT   = 28  # brojevi rankova
+PAD_RIGHT  = 28  # brojevi rankova
+PAD_TOP    = 22  # bvoje fileova
+PAD_BOTTOM = 52  # brojevi fileova + info linija
 
 # Putanja do foldera sa slikama figura
 FIGURES_DIR = os.path.join(os.path.dirname(__file__), "figures")
@@ -62,7 +62,7 @@ def init(width: int | None = None, height: int | None = None, caption="Voice Che
         return False
 
     pygame.init()
-    # Izračunaj veličinu prozora (ploča + border + padovi za oznake)
+    # izračunaj window size (ploča + border + padovi za oznake)
     board_size = TILE * 8
     w = board_size + BORDER*2 + PAD_LEFT + PAD_RIGHT
     h = board_size + BORDER*2 + PAD_TOP + PAD_BOTTOM
@@ -95,14 +95,13 @@ def render(board: chess.Board):
     import pygame
 
     def square_to_rc(square: int):
-        # Pretvara indeks polja (0-63) u redak i stupac u koordinatnom sustavu ekrana
-        # row 0 je vrh ploče; col 0 je lijevo
+        # Pretvara indeks polja (0-63) u redak i stupac
         rank = 7 - chess.square_rank(square)
         file = chess.square_file(square)
         return rank, file
 
     def get_piece_image(piece: chess.Piece):
-        # Dohvaća Surface za figuru iz cachea ili je učitava s diska i sprema u cache
+        # uzima Surface za figuru iz cachea ili je učitava s diska i sprema u cache
         key = (piece.piece_type, piece.color, TILE)
         if key in _piece_cache:
             return _piece_cache[key]
@@ -112,7 +111,7 @@ def render(board: chess.Board):
         path = os.path.join(FIGURES_DIR, filename)
         if not os.path.isfile(path):
             nonlocal_warn_missing(path)
-            # fallback: nacrtaj jednostavni krug umjesto figure
+            # fallback ako nema figure
             img = pygame.Surface((TILE, TILE), pygame.SRCALPHA)
             pygame.draw.circle(
                 img,
@@ -129,7 +128,7 @@ def render(board: chess.Board):
         return img
 
     def nonlocal_warn_missing(path):
-        # Ispiše upozorenje za nedostajuću sliku samo jednom po nazivu datoteke
+        # print upozorenje za nedostajuću sliku samo jednom po nazivu datoteke
         key = ("missing", os.path.basename(path))
         if key not in _piece_cache:
             print(f"[viewer] Missing piece image: {path}")
@@ -194,7 +193,7 @@ def render(board: chess.Board):
         rect_r = t.get_rect(midleft=(origin_x + board_size + 6, cy))
         _screen.blit(t, rect_r)
 
-    # Info linija na dnu (čiji je potez + hint da se prozor može zatvoriti)
+    # info linija na dnu (čiji je potez + hint da se prozor može zatvoriti)
     msg = f"Turn: {'White' if board.turn == chess.WHITE else 'Black'}"
     info = _info_font.render(msg + "  |  Close window to hide viewer", True, (10, 10, 10))
     _screen.blit(info, (origin_x, origin_y + board_size + 24))

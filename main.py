@@ -19,7 +19,7 @@ def print_board(board: chess.Board):
 
 
 def normalize_move_text(s: str) -> str:
-    # Normalizira tekst poteza u čisti UCI format (uklanja razmake, "to", strelice, crtice, velika slova)
+    # normalizira tekst poteza u čisti UCI format (uklanja razmake, "to", strelice, crtice, velika slova)
     s = s.strip().lower()
     s = s.replace(" to ", " ")
     s = s.replace("->", " ")
@@ -29,7 +29,7 @@ def normalize_move_text(s: str) -> str:
 
 
 def parse_move(board: chess.Board, raw: str) -> chess.Move | None:
-    # Pokušava parsirati tekst poteza u chess.Move i provjerava je li potez legalan u trenutnoj poziciji
+    # pokušava parsirati tekst poteza u chess.Move i provjerava je li potez legalan u trenutnoj poziciji
     text = normalize_move_text(raw)
     try:
         move = chess.Move.from_uci(text)
@@ -38,7 +38,7 @@ def parse_move(board: chess.Board, raw: str) -> chess.Move | None:
     return move if move in board.legal_moves else None
 
 
-# ---- "pumped" input (konzolni unos koji usput održava viewer responzivnim) ----
+# "pumped" input (konzolni unos koji usput održava viewer responzivnim) mora ovako jer viewer koristi vlastitu petlju
 def input_pumped(prompt: str) -> str:
     print(prompt, end="", flush=True)
     buf = []
@@ -70,7 +70,8 @@ def input_pumped(prompt: str) -> str:
 
 
 def choose_side():
-    # U konzoli pita igrača želi li igrati bijelim, crnim ili nasumično odabranim bojama
+    # pitaj igrača koju stranu želi igrati
+    # mozda za dodati da ako se ne odabere u X sekundi, random !!!
     while True:
         side = input_pumped("Choose side: [w]hite / [b]lack / [r]andom: ").strip().lower()
         if side in ("w", "b", "r"):
@@ -82,7 +83,7 @@ def choose_side():
     return side == "w"
 
 
-# ---- normalizator izgovorenog poteza (speech -> UCI string) ----
+# normaliizacija glasovnog unosa poteza
 def _normalize_spoken_move(text: str) -> str | None:
     """
     Primjeri:
@@ -107,13 +108,13 @@ def _normalize_spoken_move(text: str) -> str | None:
     if not tokens:
         return None
 
-    # ----- kontrolne riječi (prekid, pomoć, itd.) -----
+    # control words
     if any(w in tokens for w in ("quit", "resign", "exit")):
         return "quit"
     if "help" in tokens:
         return "help"
 
-    # ----- makni riječi za figure + "filer" riječi tipa "from", "the" itd. -----
+    # makni riječi za figure + "filer" riječi tipa "from", "the" // da se moze reci "pawn e two to e four"
     PIECE_WORDS = {"pawn", "rook", "knight", "bishop", "queen", "king", "piece"}
     FILLER = {"on", "from", "to", "the", "my", "your", "at"}
     tokens = [w for w in tokens if w not in PIECE_WORDS and w not in FILLER]
@@ -128,11 +129,11 @@ def _normalize_spoken_move(text: str) -> str | None:
         "q": "q", "r": "r", "b": "b", "n": "n",
     }
 
-    # dozvoli neke uobičajene krivo prepoznate brojeve
+    # krivo prepoznati brojevi
     def words_to_digit(w: str) -> str:
         m = {
             "one": "1",
-            "two": "2", "too": "2", "to": "2",
+            "two": "2", "too": "2", "to": "2", # 2 treba testirati jer to je i izmedu polja
             "three": "3", "tree": "3", "free": "3",
             "four": "4", "for": "4",
             "five": "5",
@@ -173,7 +174,7 @@ def _normalize_spoken_move(text: str) -> str | None:
     promo = None
     n = len(tokens)
 
-    # ---------- Strategija 1: početak oblika "e two ..." ---------- 
+    # 1. kompaktni oblik: "e2 e4" ili "e two e four"
     i = 0
     if n >= 2 and tokens[0] in files and tokens[1] in rank_words:
         src = spoken_square_to_alg(tokens[0:2])
@@ -183,7 +184,7 @@ def _normalize_spoken_move(text: str) -> str | None:
         while i < n and is_connector(tokens[i]):
             i += 1
 
-        # odredi odredišno polje, može biti u split ili compact obliku
+        # odredi target square, može biti u split ili compact obliku
         if i + 1 < n:
             dst_candidate = spoken_square_to_alg(tokens[i:i+2])
             if dst_candidate:
@@ -199,7 +200,7 @@ def _normalize_spoken_move(text: str) -> str | None:
         if i < n and tokens[i] in promo_words:
             promo = tokens[i]
 
-    # ---------- Strategija 2: razdvajanje po riječi "to" ----------
+    # 2. razdvoji oblik(to): "e two to e four" ili "e2 to e4"
     if src is None or dst is None:
         joined = " ".join(tokens)
         left_right = re.split(r"\bto\b", joined)
@@ -216,7 +217,7 @@ def _normalize_spoken_move(text: str) -> str | None:
             src = spoken_square_to_alg(left.split())
             dst = spoken_square_to_alg(right_parts)
 
-    # ---------- Strategija 3: jednostavni uzorci ----------
+    # 3. simple patterns: "e2 e4" ili "e2 e4 q" ili "e two e four" ili "e two e four queen"
     if src is None or dst is None:
         parts = tokens
 
@@ -243,8 +244,8 @@ def _normalize_spoken_move(text: str) -> str | None:
 
 
 def wait_for_voice_move(board: chess.Board, voice: AlwaysOnVoiceListener) -> chess.Move | None:
-    # Glavna petlja za čekanje glasovnog poteza: čita tekst iz AlwaysOnVoiceListener-a,
-    # normalizira ga, provjerava kontrolne naredbe (quit/help) i vraća legalni potez.
+    # glavna petlja za čekanje glasovnog poteza: čita tekst iz AlwaysOnVoiceListener-a,
+    # normalizira ga, provjerava kontrolne naredbe (quit/help) i vraća legalni potez
     print("Say: 'pawn e two to e four' (or 'help', 'quit').")
     while True:
         viewer.pump()
@@ -256,7 +257,7 @@ def wait_for_voice_move(board: chess.Board, voice: AlwaysOnVoiceListener) -> che
         print(f"You said: {text}")
         norm = _normalize_spoken_move(text)
 
-        # ---- quit / resign / exit → glasovna potvrda ----
+        # quit / resign / exit
         if norm == "quit":
             print("Say 'yes' to confirm resign and quit, or 'no' to continue.")
             confirm_deadline = time.time() + 7.0
@@ -273,15 +274,14 @@ def wait_for_voice_move(board: chess.Board, voice: AlwaysOnVoiceListener) -> che
                 if any(w in low.split() for w in ("no", "cancel", "continue")):
                     print("Okay, continuing. Say a move like 'pawn e two to e four'.")
                     break
-            # ako istekne vrijeme ili korisnik kaže "no" → nastavi slušati poteze
+            # ako istekne vrijeme ili osoba kaže "no" > slušaj opet
             continue
 
-        # ---- pomoć ili neuspješno parsiranje ----
         if norm == "help" or norm is None:
             print("Say moves like 'pawn e two to e four' or 'e seven to e eight queen'.")
             continue
 
-        # ---- pokušaj parsirati kao šahovski potez ----
+        # parsiraj potez
         move = parse_move(board, norm)
         if move:
             return move
@@ -290,12 +290,11 @@ def wait_for_voice_move(board: chess.Board, voice: AlwaysOnVoiceListener) -> che
 
 
 def random_bot_move(board: chess.Board) -> chess.Move:
-    # Vrati nasumično odabran legalan potez za bota
+    # random legelan potez za bota
     return random.choice(list(board.legal_moves))
 
 
 def announce_result(board: chess.Board):
-    # Na temelju završnog stanja ploče ispiše kako je partija završila
     outcome = board.outcome()
     if outcome is None:
         print("Game over.")
@@ -317,7 +316,7 @@ def announce_result(board: chess.Board):
 
 
 def main():
-    # Glavni ulaz u program: postavlja ploču, viewer, glasovni sustav i glavnu game-loop petlju
+    # postavljamo ploču, viewer, voice system i main loop 
     print("Voice Chess)")
     board = chess.Board()
     human_is_white = choose_side()
@@ -340,12 +339,12 @@ def main():
         else:
             print("You are Black. Bot moves first.")
 
-        # Glavna petlja partije: izmjena poteza čovjek ↔ bot dok igra ne završi
+        # main loop: human <-> bot
         while not board.is_game_over():
             viewer.pump()
             human_turn = (board.turn == chess.WHITE) == human_is_white
             if human_turn:
-                # Čekaj potez preko mikrofona
+                # Čekaj potez
                 move = wait_for_voice_move(board, voice)
                 if move is None:
                     print("You resigned / quit. Bye!")
@@ -358,7 +357,7 @@ def main():
                 viewer.pump()
                 viewer.render(board)
             else:
-                # Bot odigra nasumičan legalan potez
+                # bot igra nasumičan legalan potez
                 bot_move = random_bot_move(board)
                 bot_san = board.san(bot_move)
                 board.push(bot_move)
@@ -367,7 +366,7 @@ def main():
                 viewer.pump()
                 viewer.render(board)
     finally:
-        # Na izlazu pokušaj uredno zaustaviti glasovni thread i audio stream
+        # pokušaj zaustaviti voice thread i audio stream
         try:
             voice.stop()
         except Exception:
