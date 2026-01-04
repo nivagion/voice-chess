@@ -9,15 +9,9 @@ from vosk import Model, KaldiRecognizer
 
 
 def squares_grammar_words() -> List[str]:
-    # Generira sve moguće nazive polja u obliku koji model može čuti ("e two", "e2", itd.)
-    files = ["a", "b", "c", "d", "e", "f", "g", "h"]
-    ranks_words = [
-        "one", "two", "three", "four", "five", "six", "seven", "eight",
-        "1", "2", "3", "4", "5", "6", "7", "8",
-    ]
-    squares_spoken = [f"{f} {r}" for f in files for r in ranks_words]
-    squares_compact = [f"{f}{r}" for f in files for r in "12345678"]
-    return squares_spoken + squares_compact
+    files = ["a","b","c","d","e","f","g","h"]
+    ranks_words = ["one","two","three","four","five","six","seven","eight"]
+    return [f"{f} {r}" for f in files for r in ranks_words]
 
 
 PIECE_WORDS = ["pawn", "rook", "knight", "bishop", "queen", "king"]
@@ -56,7 +50,7 @@ class AlwaysOnVoiceListener:
         # Kreira KaldiRecognizer s listom dozvoljenih fraza (gramatika) za poboljšanje prepoznavanja
         phrases = (
             squares_grammar_words()
-            + ["to", "two", "too", "2"]
+            + ["to", "two", "too"]
             + PROMO_WORDS
             + PIECE_WORDS
             + CONTROL_WORDS
