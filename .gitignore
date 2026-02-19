@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+engines/
+
+# Keep folder structure (empty placeholders)
+!engines/.gitkeep
+!engines/windows/.gitkeep
+!engines/linux/.gitkeep
+!engines/arm64/.gitkeep
