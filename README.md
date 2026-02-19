@@ -34,11 +34,7 @@ Kako radi pipeline (kratko)
 - [`vosk`](https://pypi.org/project/vosk/)
 - [`pygame`](https://pypi.org/project/pygame/)
 
-Primjer instalacije (u virtualnom okruženju):
 
-```bash
-pip install python-chess sounddevice vosk pygame
-
-Također trebaš VOSK model, npr. vosk-model-small-en-us-0.15, u folderu:
+Također je potreban VOSK model, npr. vosk-model-small-en-us-0.15, u folderu:
 
 models/vosk-model-small-en-us-0.15

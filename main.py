@@ -9,6 +9,8 @@ import chess
 import viewer
 from always_on_voice import AlwaysOnVoiceListener
 
+from bot_engine import StockfishBot, StockfishBotConfig, find_stockfish_path, difficulty_to_elo, print_difficulty_table
+
 
 def print_board(board: chess.Board):
     print("\n  a b c d e f g h")
@@ -82,6 +84,15 @@ def choose_side():
         print(f"Random chose: {side.upper()}")
     return side == "w"
 
+def choose_difficulty() -> int:
+    print_difficulty_table()
+    while True:
+        s = input_pumped("Bot difficulty [1-10]: ").strip()
+        if s.isdigit():
+            d = int(s)
+            if 1 <= d <= 10:
+                return d
+        print("Please enter a number 1..10.")
 
 # normaliizacija glasovnog unosa poteza
 def _normalize_spoken_move(text: str) -> str | None:
@@ -321,6 +332,21 @@ def main():
     board = chess.Board()
     human_is_white = choose_side()
 
+    bot_level = choose_difficulty()
+    bot = None
+    engine_path = find_stockfish_path()
+    if not engine_path:
+        print("WARNING: Stockfish not found -> using random bot.")
+        print("Fix: install stockfish or place it in ./engines/")
+    else:
+        try:
+            bot = StockfishBot(engine_path, StockfishBotConfig(level=bot_level, threads=1, hash_mb=64))
+            print(f"Bot enabled: Stockfish ({engine_path})")
+            print(f"Difficulty: {bot_level}/10 (~{difficulty_to_elo(bot_level)} Elo target)")
+        except Exception as e:
+            print(f"WARNING: Could not start Stockfish ({e}) -> using random bot.")
+            bot = None
+
     viewer.configure(figures_dir="figures", tile=80)
     viewer.init()
     viewer.pump()
@@ -358,7 +384,7 @@ def main():
                 viewer.render(board)
             else:
                 # bot igra nasumičan legalan potez
-                bot_move = random_bot_move(board)
+                bot_move = bot.choose_move(board) if bot else random_bot_move(board)
                 bot_san = board.san(bot_move)
                 board.push(bot_move)
                 print(f"Bot played:  {bot_move.uci()} ({bot_san})")
@@ -366,9 +392,13 @@ def main():
                 viewer.pump()
                 viewer.render(board)
     finally:
-        # pokušaj zaustaviti voice thread i audio stream
         try:
             voice.stop()
+        except Exception:
+            pass
+        try:
+            if bot:
+                bot.close()
         except Exception:
             pass
 
