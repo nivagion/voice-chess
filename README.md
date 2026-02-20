@@ -38,3 +38,20 @@ Kako radi pipeline (kratko)
 Također je potreban VOSK model, npr. vosk-model-small-en-us-0.15, u folderu:
 
 models/vosk-model-small-en-us-0.15
+
+## Stockfish (bot engine) – instalacija
+
+Zbog GitHub limita (100MB) `stockfish.exe` se ne nalazi u repozitoriju.  
+Potrebno ga je ručno preuzeti i staviti u odgovarajući folder.
+
+### Windows
+1. Preuzmi Stockfish za Windows: https://stockfishchess.org/download/
+2. Raspakiraj arhivu i uzmi `stockfish.exe`
+3. Stavi ga ovdje:
+   `engines/windows/stockfish.exe`
+
+### Linux / Raspberry Pi
+Najlakše (preko apt):
+```bash
+sudo apt update
+sudo apt install stockfish
