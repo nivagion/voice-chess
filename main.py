@@ -354,7 +354,7 @@ def main():
 
     # Always-on mic (VOSK model za engleski)
     MODEL_DIR = "models/vosk-model-small-en-us-0.15"
-    SAMPLE_RATE = 16000
+    SAMPLE_RATE = 48000
     voice = AlwaysOnVoiceListener(MODEL_DIR, sample_rate=SAMPLE_RATE, move_window=5.0, verbose=True)
     voice.start()
 

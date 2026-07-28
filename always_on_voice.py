@@ -72,6 +72,7 @@ class AlwaysOnVoiceListener:
                 pass
 
         self._stream = sd.RawInputStream(
+            device=1,
             samplerate=self.sample_rate,
             blocksize=8000,
             dtype="int16",
