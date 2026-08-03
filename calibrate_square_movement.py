@@ -4,57 +4,47 @@ from evdev import InputDevice, ecodes, list_devices
 import select
 import subprocess
 
+from physical_config import (
+    DIR1_PIN,
+    DIR1_START_STATE,
+    DIR2_PIN,
+    DIR2_START_STATE,
+    HORIZONTAL_STEPS_PER_SQUARE,
+    MAGNET_PIN,
+    MAGNET_START_STATE,
+    MOVE_SETTLE_TIME,
+    SQUARE_SIZE_CM,
+    STEP1_PIN,
+    STEP1_START_STATE,
+    STEP2_PIN,
+    STEP2_START_STATE,
+    STEP_HIGH_TIME,
+    STEP_LOW_TIME,
+    VERTICAL_STEPS_PER_SQUARE,
+)
+
 # ============================================================
 # USER CALIBRATION VALUES
 # ============================================================
 
-# Measure one physical chessboard square and enter its width here.
-SQUARE_SIZE_CM = 7.0
-
-# Start with conservative values, run one-square tests, measure the
-# actual travel, and then replace these values using:
+# Calibration values now live in physical_config.py so the application and
+# this utility use one source of truth. To recalibrate, update them there using:
 #
 # new_steps = old_steps * SQUARE_SIZE_CM / measured_distance_cm
 #
 # Horizontal and vertical are separate in case the mechanism behaves
 # slightly differently on the two axes.
-HORIZONTAL_STEPS_PER_SQUARE = 352
-VERTICAL_STEPS_PER_SQUARE = 355
-
-# These values control speed, not movement distance.
-# They match the approximate stepping rhythm of motor_and_magnet.py.
-STEP_HIGH_TIME = 0.0017
-STEP_LOW_TIME = 0.0002
-
-# Pause after each completed movement.
-MOVE_SETTLE_TIME = 0.10
-
-# ============================================================
-# GPIO PIN CONFIGURATION - BCM numbering
-# ============================================================
-
-DIR1_PIN = 20
-STEP1_PIN = 21
-
-DIR2_PIN = 23
-STEP2_PIN = 24
-
-MAGNET_PIN = 17
-
-DIR1_START_STATE = False
-STEP1_START_STATE = False
-DIR2_START_STATE = False
-STEP2_START_STATE = False
-MAGNET_START_STATE = False
+dir1 = step1 = dir2 = step2 = magnet = None
 
 
-dir1 = OutputDevice(DIR1_PIN, initial_value=DIR1_START_STATE)
-step1 = OutputDevice(STEP1_PIN, initial_value=STEP1_START_STATE)
-
-dir2 = OutputDevice(DIR2_PIN, initial_value=DIR2_START_STATE)
-step2 = OutputDevice(STEP2_PIN, initial_value=STEP2_START_STATE)
-
-magnet = OutputDevice(MAGNET_PIN, initial_value=MAGNET_START_STATE)
+def initialize_gpio():
+    """Claim GPIO only when the calibration utility is explicitly run."""
+    global dir1, step1, dir2, step2, magnet
+    dir1 = OutputDevice(DIR1_PIN, initial_value=DIR1_START_STATE)
+    step1 = OutputDevice(STEP1_PIN, initial_value=STEP1_START_STATE)
+    dir2 = OutputDevice(DIR2_PIN, initial_value=DIR2_START_STATE)
+    step2 = OutputDevice(STEP2_PIN, initial_value=STEP2_START_STATE)
+    magnet = OutputDevice(MAGNET_PIN, initial_value=MAGNET_START_STATE)
 
 
 # ============================================================
@@ -89,6 +79,8 @@ def reset_pins_to_start_state():
 
 
 def cleanup_gpio():
+    if magnet is None:
+        return
     print("\nResetting GPIO pins...")
 
     reset_pins_to_start_state()
@@ -320,6 +312,7 @@ def print_controls():
 # ============================================================
 
 def main():
+    initialize_gpio()
     keyboard = find_keyboard()
 
     print_controls()
