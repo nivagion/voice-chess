@@ -10,6 +10,13 @@ import viewer
 from always_on_voice import AlwaysOnVoiceListener
 
 from bot_engine import StockfishBot, StockfishBotConfig, find_stockfish_path, difficulty_to_elo, print_difficulty_table
+from physical_hardware import FakeHardwareDriver, GpioHardwareDriver
+from physical_movement import (
+    GraveyardManager,
+    PhysicalMoveCoordinator,
+    PhysicalMoveExecutor,
+    UnsupportedPhysicalMove,
+)
 
 
 def print_board(board: chess.Board):
@@ -358,6 +365,56 @@ def main():
     voice = AlwaysOnVoiceListener(MODEL_DIR, sample_rate=SAMPLE_RATE, move_window=5.0, verbose=True)
     voice.start()
 
+    # Real GPIO is the default on the physical board. For development/tests,
+    # VOICE_CHESS_FAKE_HARDWARE=1 selects a driver that only records commands.
+    try:
+        if os.getenv("VOICE_CHESS_FAKE_HARDWARE") == "1":
+            hardware = FakeHardwareDriver()
+            print("WARNING: Fake physical hardware enabled; pieces will not move.")
+        else:
+            hardware = GpioHardwareDriver()
+    except BaseException:
+        voice.stop()
+        if bot:
+            bot.close()
+        raise
+    graveyard = GraveyardManager()  # New instance resets all slots for this game.
+    movement = PhysicalMoveCoordinator(PhysicalMoveExecutor(hardware), graveyard)
+
+    def perform_physical_move(move: chess.Move) -> bool:
+        def show_status(message: str) -> None:
+            print(f"[Physical] {message}")
+            viewer.set_status(message)
+            viewer.render(board)
+
+        try:
+            movement.perform_move(
+                board,
+                move,
+                voice,
+                pump=viewer.pump,
+                status=show_status,
+            )
+        except UnsupportedPhysicalMove as exc:
+            message = f"Move {move.uci()} rejected: {exc}"
+            print(message)
+            viewer.set_status(message)
+            viewer.render(board)
+            return False
+        except BaseException as exc:
+            message = f"Physical movement ERROR: {exc}"
+            print(message)
+            print(
+                "Listening remains paused and the chess move was not committed. "
+                "Turn the system off safely, manually place the carriage at the "
+                "centre between D/E and ranks 4/5, and restart the application. "
+                "The recovery API can also reset tracking without moving motors."
+            )
+            viewer.set_status(message)
+            viewer.render(board)
+            raise
+        return True
+
     try:
         print_board(board)
         if human_is_white:
@@ -377,7 +434,8 @@ def main():
                     viewer.close()
                     sys.exit(0)
                 human_san = board.san(move)
-                board.push(move)
+                if not perform_physical_move(move):
+                    continue
                 print(f"You played: {move.uci()} ({human_san})")
                 print_board(board)
                 viewer.pump()
@@ -386,7 +444,8 @@ def main():
                 # bot igra nasumičan legalan potez
                 bot_move = bot.choose_move(board) if bot else random_bot_move(board)
                 bot_san = board.san(bot_move)
-                board.push(bot_move)
+                if not perform_physical_move(bot_move):
+                    continue
                 print(f"Bot played:  {bot_move.uci()} ({bot_san})")
                 print_board(board)
                 viewer.pump()
@@ -401,6 +460,10 @@ def main():
                 bot.close()
         except Exception:
             pass
+        try:
+            hardware.close()
+        except Exception as exc:
+            print(f"WARNING: Physical hardware cleanup failed: {exc}")
 
 
 if __name__ == "__main__":

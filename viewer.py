@@ -28,6 +28,7 @@ _warned = False
 _piece_cache = {}
 _screen = None
 _info_font = None
+_status_message = ""
 
 # Mapiranje tipa figure na slovo iz imena PNG datoteka
 PIECE_LETTER = {
@@ -87,6 +88,11 @@ def pump():
             _screen = None
             _enabled = False
             return
+
+def set_status(message: str):
+    """Set an application status line displayed on the next render."""
+    global _status_message
+    _status_message = message
 
 def render(board: chess.Board):
     """Iscrtava trenutno stanje šahovske ploče. Ako viewer nije aktivan, funkcija ne radi ništa."""
@@ -194,8 +200,9 @@ def render(board: chess.Board):
         _screen.blit(t, rect_r)
 
     # info linija na dnu (čiji je potez + hint da se prozor može zatvoriti)
-    msg = f"Turn: {'White' if board.turn == chess.WHITE else 'Black'}"
-    info = _info_font.render(msg + "  |  Close window to hide viewer", True, (10, 10, 10))
+    msg = _status_message or f"Turn: {'White' if board.turn == chess.WHITE else 'Black'}"
+    color = (150, 20, 20) if "error" in msg.lower() else (10, 10, 10)
+    info = _info_font.render(msg, True, color)
     _screen.blit(info, (origin_x, origin_y + board_size + 24))
 
     pygame.display.flip()

@@ -41,8 +41,10 @@ class AlwaysOnVoiceListener:
         self._audio_q: "queue.Queue[bytes]" = queue.Queue(maxsize=64)  # bafer za audio blokove iz callbacka
         self._out_q: "queue.Queue[str]" = queue.Queue()                # bafer za prepoznati tekst
         self._stop = threading.Event()
+        self._paused = threading.Event()
         self._thread: Optional[threading.Thread] = None
         self._stream: Optional[sd.RawInputStream] = None
+        self._rec_lock = threading.Lock()
 
         self._rec = self._make_recognizer()
 
@@ -81,6 +83,7 @@ class AlwaysOnVoiceListener:
         )
         self._stream.start()
         self._stop.clear()
+        self._paused.clear()
         self._thread = threading.Thread(target=self._proc_loop, daemon=True)
         self._thread.start()
         if self.verbose:
@@ -96,6 +99,38 @@ class AlwaysOnVoiceListener:
             self._stream.close()
         self._thread = None
         self._stream = None
+
+    def _drain_queue(self, q: queue.Queue) -> None:
+        while True:
+            try:
+                q.get_nowait()
+            except queue.Empty:
+                return
+
+    def pause(self) -> None:
+        """Stop accepting audio and discard speech queued before movement."""
+        self._paused.set()
+        if self._stream:
+            self._stream.stop()
+        # Wait for any in-flight recognition call before clearing its data.
+        with self._rec_lock:
+            pass
+        self._drain_queue(self._audio_q)
+        self._drain_queue(self._out_q)
+        if self.verbose:
+            print("[Voice] Mic paused for physical movement.")
+
+    def resume(self) -> None:
+        """Start with a fresh recognizer after physical movement completes."""
+        self._drain_queue(self._audio_q)
+        self._drain_queue(self._out_q)
+        with self._rec_lock:
+            self._rec = self._make_recognizer()
+        self._paused.clear()
+        if self._stream:
+            self._stream.start()
+        if self.verbose:
+            print("[Voice] Mic resumed.")
 
     def get_text_nowait(self) -> Optional[str]:
         # Ne-blokirajuće dohvaćanje sljedeće prepoznate fraze (ili None ako nema ništa)
@@ -113,22 +148,28 @@ class AlwaysOnVoiceListener:
         # Glavna petlja u pozadinskom threadu: čita audio blokove, šalje ih u VOSK i obrađuje rezultate
         last_partial_print = 0.0
         while not self._stop.is_set():
+            if self._paused.is_set():
+                time.sleep(0.05)
+                continue
             try:
                 data = self._audio_q.get(timeout=0.1)
             except queue.Empty:
                 continue
 
-            if self._rec.AcceptWaveform(data):
+            with self._rec_lock:
+                accepted = self._rec.AcceptWaveform(data)
+                result = self._rec.Result() if accepted else self._rec.PartialResult()
+            if accepted:
                 # Kad je prepoznata cijela fraza, Result() vraća konačan tekst
-                j = json.loads(self._rec.Result())
+                j = json.loads(result)
                 text = j.get("text", "").strip()
-                if text:
+                if text and not self._paused.is_set():
                     if self.verbose:
                         print(f"[heard] {text}")
                     self._emit(text)
             else:
                 # Inače koristimo PartialResult za djelomične (trenutno slušane) fraze
-                pj = json.loads(self._rec.PartialResult())
+                pj = json.loads(result)
                 partial = pj.get("partial", "").strip()
                 now = time.time()
                 if self.verbose and partial and now - last_partial_print > 0.8:
