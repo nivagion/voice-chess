@@ -17,8 +17,8 @@ def squares_grammar_words() -> List[str]:
 PIECE_WORDS = ["pawn", "rook", "knight", "bishop", "queen", "king"]
 PROMO_WORDS = ["queen", "rook", "bishop", "knight", "q", "r", "b", "n"]
 CONTROL_WORDS = [
-    "help", "quit", "exit", "resign", "cancel",
-    "yes", "no", "yeah", "yep", "continue",
+    "help", "quit game", "resign game", "exit game",
+    "yes", "confirm", "yeah", "yep", "no", "cancel", "continue",
 ]
 
 

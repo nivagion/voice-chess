@@ -110,7 +110,7 @@ def _normalize_spoken_move(text: str) -> str | None:
       "e seven to e eight queen"    -> "e7e8q"
 
     Vraća:
-      - "quit"  ako se prepozna naredba za prekid (quit / resign / exit)
+      - "quit"  ako se prepozna naredba "quit game" (ili resign/exit game)
       - "help"  ako se prepozna zahtjev za pomoć
       - "e2e4" / "e7e8q" ... za poteze
       - None    ako se ne može ispravno parsirati
@@ -127,7 +127,8 @@ def _normalize_spoken_move(text: str) -> str | None:
         return None
 
     # control words
-    if any(w in tokens for w in ("quit", "resign", "exit")):
+    # Require a full quit phrase so a stray word cannot interrupt a move.
+    if tuple(tokens) in (("quit", "game"), ("resign", "game"), ("exit", "game")):
         return "quit"
     if "help" in tokens:
         return "help"
@@ -264,7 +265,7 @@ def _normalize_spoken_move(text: str) -> str | None:
 def wait_for_voice_move(board: chess.Board, voice: AlwaysOnVoiceListener) -> chess.Move | None:
     # glavna petlja za čekanje glasovnog poteza: čita tekst iz AlwaysOnVoiceListener-a,
     # normalizira ga, provjerava kontrolne naredbe (quit/help) i vraća legalni potez
-    print("Say: 'pawn e two to e four' (or 'help', 'quit').")
+    print("Say: 'pawn e two to e four' (or 'help', 'quit game').")
     while True:
         viewer.pump()
         text = voice.get_text_nowait()
@@ -275,9 +276,9 @@ def wait_for_voice_move(board: chess.Board, voice: AlwaysOnVoiceListener) -> che
         print(f"You said: {text}")
         norm = _normalize_spoken_move(text)
 
-        # quit / resign / exit
+        # Only the explicit quit command asks for confirmation.
         if norm == "quit":
-            print("Say 'yes' to confirm resign and quit, or 'no' to continue.")
+            print("Quit game? Say 'yes' or 'confirm' to leave, or 'no' to continue.")
             confirm_deadline = time.time() + 7.0
             while time.time() < confirm_deadline:
                 viewer.pump()
@@ -285,14 +286,13 @@ def wait_for_voice_move(board: chess.Board, voice: AlwaysOnVoiceListener) -> che
                 if not reply:
                     time.sleep(0.05)
                     continue
-                print(f"You said (confirm): {reply}")
-                low = reply.lower()
-                if any(w in low.split() for w in ("yes", "yeah", "yep")):
+                print(f"Quit response: {reply}")
+                answer = reply.strip().lower()
+                if answer in ("yes", "confirm", "yeah", "yep"):
                     return None
-                if any(w in low.split() for w in ("no", "cancel", "continue")):
+                if answer in ("no", "cancel", "continue"):
                     print("Okay, continuing. Say a move like 'pawn e two to e four'.")
                     break
-            # ako istekne vrijeme ili osoba kaže "no" > slušaj opet
             continue
 
         if norm == "help" or norm is None:
