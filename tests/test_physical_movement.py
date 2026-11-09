@@ -130,6 +130,36 @@ class PlanningAndExecutionTests(unittest.TestCase):
         board = chess.Board()
         plan = plan_physical_move(board, chess.Move.from_uci("e2e4"), GraveyardManager())
         self.assertEqual(len(plan.operations), 1)
+        self.assertEqual(plan.operations[0].carried_segments, (
+            Segment(board_square_center("e2"), board_square_center("e4")),
+        ))
+
+    def test_straight_piece_moves_go_through_square_centers(self):
+        cases = (
+            ("4k3/8/8/8/8/8/8/R3K3 w - - 0 1", "a1a4"),
+            ("4k3/8/8/8/8/8/4Q3/4K3 w - - 0 1", "e2e4"),
+            ("4k3/8/8/8/8/8/8/4K3 w - - 0 1", "e1e2"),
+        )
+        for fen, uci in cases:
+            with self.subTest(uci=uci):
+                move = chess.Move.from_uci(uci)
+                plan = plan_physical_move(chess.Board(fen), move, GraveyardManager())
+                self.assertEqual(plan.operations[0].carried_segments, (
+                    Segment(board_square_center(uci[:2]), board_square_center(uci[2:4])),
+                ))
+
+    def test_diagonal_and_knight_moves_stay_on_lanes(self):
+        cases = (
+            ("4k3/8/8/8/8/8/8/2B1K3 w - - 0 1", "c1f4"),
+            (chess.STARTING_FEN, "g1f3"),
+        )
+        for fen, uci in cases:
+            with self.subTest(uci=uci):
+                move = chess.Move.from_uci(uci)
+                plan = plan_physical_move(chess.Board(fen), move, GraveyardManager())
+                source = board_square_center(uci[:2])
+                destination = board_square_center(uci[2:4])
+                self.assertEqual(plan.operations[0].carried_segments, plan_carried_path(source, destination))
 
     def test_capture_removes_target_first(self):
         board, move = capture_board(chess.BLACK)
@@ -138,6 +168,19 @@ class PlanningAndExecutionTests(unittest.TestCase):
         self.assertEqual(plan.operations[0].description, "remove captured piece")
         self.assertEqual(plan.operations[0].source, board_square_center("a8"))
         self.assertEqual(plan.operations[1].description, "move attacking piece")
+        self.assertEqual(plan.operations[0].carried_segments, plan_carried_path(
+            plan.operations[0].source, plan.operations[0].destination,
+        ))
+        self.assertEqual(plan.operations[1].carried_segments, (
+            Segment(board_square_center("a1"), board_square_center("a8")),
+        ))
+
+    def test_diagonal_capture_stays_on_lanes(self):
+        board = chess.Board("4k3/8/8/8/5p2/8/8/2B1K3 w - - 0 1")
+        plan = plan_physical_move(board, chess.Move.from_uci("c1f4"), GraveyardManager())
+        self.assertEqual(plan.operations[1].carried_segments, plan_carried_path(
+            board_square_center("c1"), board_square_center("f4"),
+        ))
 
     def test_captured_colors_use_correct_graveyards(self):
         for color, expected_x2 in ((chess.WHITE, 2), (chess.BLACK, 20)):

@@ -144,7 +144,13 @@ def plan_physical_move(
 
     source = board_square_center(chess.square_name(move.from_square))
     destination = board_square_center(chess.square_name(move.to_square))
-    attacker = PieceOperation(source, destination, plan_carried_path(source, destination), "move attacking piece")
+    # Legal straight moves have a clear rank or file. On captures the target
+    # is removed before this operation, leaving the destination clear too.
+    if source.x2 == destination.x2 or source.y2 == destination.y2:
+        attacker_path = (Segment(source, destination),)
+    else:
+        attacker_path = plan_carried_path(source, destination)
+    attacker = PieceOperation(source, destination, attacker_path, "move attacking piece")
 
     if not board.is_capture(move):
         return PhysicalMovePlan(move, (attacker,))
