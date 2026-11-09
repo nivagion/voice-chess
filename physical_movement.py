@@ -10,6 +10,7 @@ from typing import Callable, Protocol
 
 import chess
 
+from physical_config import MAGNET_PICKUP_SETTLE_TIME
 from physical_geometry import (
     START_POSITION,
     Point,
@@ -199,6 +200,7 @@ class PhysicalMoveExecutor:
 
                 self.hardware.magnet_on()
                 self.carriage.magnet_on = True
+                time.sleep(MAGNET_PICKUP_SETTLE_TIME)
                 for segment_index, segment in enumerate(operation.carried_segments):
                     self._move_segment(segment, operation_index, segment_index)
                 self.hardware.magnet_off()

@@ -1,8 +1,9 @@
 import unittest
+from unittest.mock import patch
 
 import chess
 
-from physical_config import HORIZONTAL_STEPS_PER_SQUARE, VERTICAL_STEPS_PER_SQUARE
+from physical_config import HORIZONTAL_STEPS_PER_SQUARE, MAGNET_PICKUP_SETTLE_TIME, VERTICAL_STEPS_PER_SQUARE
 from physical_geometry import (
     MAX_X2,
     MAX_Y2,
@@ -225,6 +226,22 @@ class PlanningAndExecutionTests(unittest.TestCase):
         coordinator = PhysicalMoveCoordinator(executor, GraveyardManager())
         coordinator.perform_move(board, chess.Move.from_uci("e2e4"), FakeListener())
         self.assertEqual(executor.carriage.position, board_square_center("e4"))
+
+    def test_magnet_waits_before_each_piece_is_carried(self):
+        board, move = capture_board(chess.BLACK)
+        graveyard = GraveyardManager()
+        plan = plan_physical_move(board, move, graveyard)
+        hardware = FakeHardwareDriver()
+        delays = []
+
+        def record_delay(seconds):
+            delays.append(seconds)
+            self.assertEqual(hardware.commands[-1], HardwareCommand("magnet_on"))
+
+        with patch("physical_movement.time.sleep", side_effect=record_delay):
+            PhysicalMoveExecutor(hardware).execute(plan, graveyard)
+
+        self.assertEqual(delays, [MAGNET_PICKUP_SETTLE_TIME] * 2)
 
     def test_special_moves_are_rejected_before_board_change(self):
         cases = [
